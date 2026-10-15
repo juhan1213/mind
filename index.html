@@ -1,0 +1,342 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>마음온 | 감정 분석</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+      "Noto Sans KR", sans-serif;
+    background: #f4f5fb;
+    color: #24263b;
+    line-height: 1.6;
+  }
+  .container { max-width: 760px; margin: auto; padding: 24px 16px 48px; }
+  header { text-align: center; padding: 24px 0; }
+  .logo { font-size: 14px; color: #7168d8; font-weight: 800; letter-spacing: 2px; }
+  h1 { font-size: 32px; margin: 10px 0; }
+  .subtitle { color: #777b91; font-size: 15px; }
+  .card {
+    background: white; border-radius: 20px; padding: 24px;
+    margin: 16px 0; box-shadow: 0 5px 24px #25284a0a;
+  }
+  .notice { background: #eeedff; color: #5149a8; font-size: 13px; }
+  .progress-wrap { margin: 20px 0; }
+  .progress-label { display:flex; justify-content:space-between; font-size:13px; color:#777b91; }
+  .progress { height: 7px; background:#e9e9f3; border-radius:9px; margin-top:8px; overflow:hidden; }
+  .progress-bar { height:100%; width:0; background:#776be5; transition:width .2s; }
+  .question { padding: 20px 0; border-bottom:1px solid #eeeef5; }
+  .question:last-child { border-bottom:0; }
+  .q-title { font-weight:700; margin-bottom:14px; }
+  .q-category { font-size:12px; color:#8278db; margin-bottom:5px; }
+  .options { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .option { position:relative; }
+  .option input { position:absolute; opacity:0; }
+  .option label {
+    display:flex; justify-content:center; align-items:center;
+    min-height:45px; padding:8px 3px; text-align:center;
+    border:1px solid #e4e4ef; border-radius:11px;
+    font-size:13px; color:#656980; cursor:pointer;
+  }
+  .option input:checked + label {
+    border-color:#776be5; background:#f0efff;
+    color:#574bc3; font-weight:700;
+  }
+  .option input:focus-visible + label { outline:2px solid #776be5; }
+  button {
+    width:100%; padding:16px; border:0; border-radius:13px;
+    background:#7569df; color:white; font-size:16px;
+    font-weight:700; cursor:pointer;
+  }
+  button:hover { background:#6255cb; }
+  button:disabled { background:#c9c7e8; cursor:not-allowed; }
+  .secondary { background:#efeff8; color:#555875; margin-top:10px; }
+  .secondary:hover { background:#e4e3f2; }
+  #result { display:none; }
+  .result-head { text-align:center; padding:12px 0 20px; }
+  .emoji { font-size:48px; }
+  .total-score { font-size:46px; font-weight:800; color:#7166d7; }
+  .muted { color:#85889c; font-size:13px; }
+  .result-item { padding:17px 0; border-bottom:1px solid #eeeef5; }
+  .result-item:last-child { border-bottom:0; }
+  .result-top { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+  .level { font-size:12px; padding:4px 10px; border-radius:20px; background:#efeff8; white-space:nowrap; }
+  .meter { height:9px; border-radius:10px; background:#eeeef5; overflow:hidden; margin:10px 0; }
+  .meter-fill { height:100%; border-radius:10px; background:#8b7be8; }
+  .advice { background:#f7f6ff; border-radius:14px; padding:16px; margin-top:16px; }
+  .advice h3 { margin-top:0; font-size:16px; }
+  .small { font-size:12px; color:#85889c; }
+  footer { text-align:center; font-size:12px; color:#9295a8; padding:24px 0; }
+  @media(max-width:480px) {
+    h1 { font-size:27px; }
+    .card { padding:18px; }
+    .options { gap:5px; }
+    .option label { font-size:12px; min-height:48px; }
+  }
+  @media print {
+    body { background:white; }
+    #survey, #start-card, .secondary, #print-btn, footer { display:none !important; }
+    #result { display:block !important; }
+    .card { box-shadow:none; border:1px solid #eee; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo">MAEUM ON · 마음온</div>
+    <h1>지금, 내 마음은 어떤가요?</h1>
+    <div class="subtitle">잠깐 멈추어 나의 감정을 들여다보세요.</div>
+  </header>
+
+  <div class="card notice" id="start-card">
+    <strong>마음 체크 안내</strong><br>
+    최근 7일 동안의 나를 떠올리며 가장 가까운 답을 선택해 주세요.
+    정답은 없으며, 결과는 자기 이해를 위한 참고 자료입니다.
+  </div>
+
+  <section id="survey">
+    <div class="card">
+      <div class="progress-wrap">
+        <div class="progress-label">
+          <span>감정 체크 질문</span>
+          <span id="progress-text">0 / 8 답변</span>
+        </div>
+        <div class="progress"><div class="progress-bar" id="progress-bar"></div></div>
+      </div>
+      <div id="questions"></div>
+      <button id="analyze-btn" disabled>내 감정 분석하기</button>
+      <p class="small">모든 질문에 답하면 분석할 수 있어요.</p>
+    </div>
+  </section>
+
+  <section id="result" aria-live="polite">
+    <div class="card">
+      <div class="result-head">
+        <div class="emoji" id="result-emoji">🌿</div>
+        <h2 id="result-title">나의 감정 리포트</h2>
+        <div class="muted">감정 자기 점검 결과</div>
+        <div class="total-score" id="total-score">0</div>
+        <div class="muted">총 점수 / 24점</div>
+        <p id="result-summary"></p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>감정별 분석</h2>
+      <p class="muted">각 영역은 0~6점이며, 점수가 높을수록 해당 어려움을 더 자주 경험했다는 뜻이에요.</p>
+      <div id="category-results"></div>
+    </div>
+
+    <div class="card">
+      <h2>나를 위한 작은 제안</h2>
+      <div id="advice-list"></div>
+    </div>
+
+    <div class="card notice">
+      <strong>기억해 주세요</strong><br>
+      이 결과는 자체 제작한 비임상적 자기 점검 도구로, 의학적 진단이나
+      검증된 심리검사가 아닙니다. 점수가 높다고 해서 특정 질환이 있다는
+      의미는 아니에요. 힘든 감정이 지속되거나 일상생활에 지장을 준다면
+      정신건강 전문가와 상담해 보세요.
+    </div>
+    <button id="print-btn" onclick="window.print()">결과 저장 / 인쇄하기</button>
+    <button class="secondary" id="retry-btn">다시 검사하기</button>
+  </section>
+
+  <footer>마음온 · 나를 이해하는 작은 시작</footer>
+</div>
+
+<script>
+const categories = {
+  stress: {
+    name: "스트레스",
+    emoji: "🌧️",
+    descriptions: [
+      "최근 스트레스를 크게 느끼지 않은 편이에요.",
+      "가끔 부담을 느끼지만 휴식으로 회복할 수 있어요.",
+      "스트레스가 쌓이고 있을 수 있어요. 의식적으로 쉬어 보세요.",
+      "스트레스가 상당히 부담스러울 수 있어요. 도움과 휴식을 우선해 보세요."
+    ],
+    advice: "해야 할 일을 잠시 내려놓고, 5분간 천천히 호흡하거나 할 일을 하나씩 정리해 보세요."
+  },
+  anxiety: {
+    name: "불안감",
+    emoji: "☁️",
+    descriptions: [
+      "걱정이나 긴장감이 비교적 적은 편이에요.",
+      "가끔 걱정이 생기지만 스스로 다독여 볼 수 있어요.",
+      "걱정이 마음을 차지하는 시간이 늘었을 수 있어요.",
+      "불안과 긴장이 일상에 부담을 주고 있을 수 있어요."
+    ],
+    advice: "걱정되는 일을 글로 적고, 지금 할 수 있는 일과 당장 바꿀 수 없는 일을 구분해 보세요."
+  },
+  mood: {
+    name: "우울감",
+    emoji: "🌙",
+    descriptions: [
+      "최근 기분 저하나 흥미 감소를 적게 경험한 편이에요.",
+      "가끔 기분이 가라앉을 수 있어요. 자신에게 여유를 주세요.",
+      "기분 저하나 즐거움 감소가 잦았을 수 있어요.",
+      "마음이 많이 지쳐 있을 수 있어요. 혼자 감당하지 않아도 괜찮아요."
+    ],
+    advice: "가벼운 산책, 규칙적인 식사와 수면을 시도해 보세요. 믿을 수 있는 사람에게 마음을 나누는 것도 좋아요."
+  },
+  energy: {
+    name: "정서적 에너지",
+    emoji: "🍃",
+    descriptions: [
+      "에너지가 비교적 잘 유지되고 있는 편이에요.",
+      "가끔 피곤하거나 의욕이 떨어질 수 있어요.",
+      "에너지가 부족하고 시작하기 버거운 날이 많았을 수 있어요.",
+      "충분히 쉬고 도움을 받을 필요가 있을 만큼 지쳤을 수 있어요."
+    ],
+    advice: "큰 목표 대신 5분 안에 할 수 있는 작은 일을 정해 보세요. 휴식도 해야 할 일에 포함해 주세요."
+  }
+};
+
+const questions = [
+  { c:"stress", q:"해야 할 일이나 주변 상황 때문에 압박감을 느꼈다." },
+  { c:"stress", q:"쉬는 시간에도 마음이 편안하지 않고 긴장되었다." },
+  { c:"anxiety", q:"아직 일어나지 않은 일에 대해 지나치게 걱정했다." },
+  { c:"anxiety", q:"걱정을 멈추기 어렵거나 이유 없이 불안했다." },
+  { c:"mood", q:"기분이 가라앉거나 슬프고 공허하게 느껴졌다." },
+  { c:"mood", q:"평소 좋아하던 일에도 흥미나 즐거움이 줄었다." },
+  { c:"energy", q:"피곤하거나 지쳐서 일상적인 일을 시작하기 어려웠다." },
+  { c:"energy", q:"평소보다 의욕이 부족하고 무기력하게 느껴졌다." }
+];
+
+const choices = [
+  { label:"전혀 없음", value:0 },
+  { label:"가끔", value:1 },
+  { label:"자주", value:2 },
+  { label:"거의 매일", value:3 }
+];
+
+const questionBox = document.getElementById("questions");
+
+questions.forEach((item, i) => {
+  const section = document.createElement("div");
+  section.className = "question";
+  section.innerHTML = `
+    <div class="q-category">${categories[item.c].emoji} ${categories[item.c].name}</div>
+    <div class="q-title">${i+1}. ${item.q}</div>
+    <div class="options" role="radiogroup" aria-label="${i+1}번 질문">
+      ${choices.map(choice => `
+        <div class="option">
+          <input type="radio" id="q${i}_${choice.value}"
+            name="q${i}" value="${choice.value}">
+          <label for="q${i}_${choice.value}">${choice.label}</label>
+        </div>`).join("")}
+    </div>`;
+  questionBox.appendChild(section);
+});
+
+function getAnswers() {
+  return questions.map((_, i) => {
+    const selected = document.querySelector(`input[name="q${i}"]:checked`);
+    return selected ? Number(selected.value) : null;
+  });
+}
+
+function updateProgress() {
+  const answers = getAnswers();
+  const count = answers.filter(v => v !== null).length;
+  document.getElementById("progress-text").textContent = `${count} / ${questions.length} 답변`;
+  document.getElementById("progress-bar").style.width = `${count / questions.length * 100}%`;
+  document.getElementById("analyze-btn").disabled = count !== questions.length;
+}
+
+questionBox.addEventListener("change", updateProgress);
+
+function getLevel(score) {
+  if (score <= 1) return { name:"낮음", index:0 };
+  if (score <= 3) return { name:"가벼움", index:1 };
+  if (score <= 4) return { name:"주의", index:2 };
+  return { name:"높음", index:3 };
+}
+
+document.getElementById("analyze-btn").addEventListener("click", () => {
+  const answers = getAnswers();
+  if (answers.some(v => v === null)) return;
+
+  const scores = { stress:0, anxiety:0, mood:0, energy:0 };
+  questions.forEach((q, i) => scores[q.c] += answers[i]);
+  const total = answers.reduce((sum, n) => sum + n, 0);
+  const highest = Object.keys(scores).sort((a,b) => scores[b] - scores[a])[0];
+
+  document.getElementById("total-score").textContent = total;
+  document.getElementById("result-emoji").textContent =
+    total <= 5 ? "🌱" : total <= 11 ? "🌿" : total <= 17 ? "🌥️" : "🫂";
+  document.getElementById("result-title").textContent =
+    total <= 5 ? "마음이 비교적 안정적이에요" :
+    total <= 11 ? "마음을 살펴볼 시간이에요" :
+    total <= 17 ? "나에게 휴식이 필요할 수 있어요" :
+    "지금은 나를 더 세심히 돌봐 주세요";
+
+  document.getElementById("result-summary").textContent =
+    `전체 점수는 ${total}/24점이에요. 가장 높은 영역은 '${categories[highest].name}'입니다. ` +
+    `점수는 진단이 아니라 최근 마음의 경험을 돌아보기 위한 참고 자료예요.`;
+
+  const resultBox = document.getElementById("category-results");
+  resultBox.replaceChildren();
+  Object.keys(categories).forEach(key => {
+    const score = scores[key];
+    const level = getLevel(score);
+    const item = document.createElement("div");
+    item.className = "result-item";
+    item.innerHTML = `
+      <div class="result-top">
+        <strong>${categories[key].emoji} ${categories[key].name}</strong>
+        <span><strong>${score}/6</strong> <span class="level">${level.name}</span></span>
+      </div>
+      <div class="meter" role="img" aria-label="${categories[key].name} ${score}점, 6점 만점">
+        <div class="meter-fill" style="width:${score/6*100}%"></div>
+      </div>
+      <div class="muted">${categories[key].descriptions[level.index]}</div>`;
+    resultBox.appendChild(item);
+  });
+
+  const adviceBox = document.getElementById("advice-list");
+  adviceBox.replaceChildren();
+  Object.keys(categories)
+    .filter(key => scores[key] >= 2)
+    .sort((a,b) => scores[b] - scores[a])
+    .forEach(key => {
+      const item = document.createElement("div");
+      item.className = "advice";
+      const title = document.createElement("h3");
+      title.textContent = `${categories[key].emoji} ${categories[key].name}`;
+      const p = document.createElement("p");
+      p.textContent = categories[key].advice;
+      item.append(title, p);
+      adviceBox.appendChild(item);
+    });
+
+  if (!adviceBox.children.length) {
+    const p = document.createElement("p");
+    p.textContent = "지금처럼 자신의 마음을 살피는 시간을 가져 보세요. 편안함을 유지하는 나만의 방법을 찾아보는 것도 좋아요.";
+    adviceBox.appendChild(p);
+  }
+
+  document.getElementById("survey").style.display = "none";
+  document.getElementById("start-card").style.display = "none";
+  document.getElementById("result").style.display = "block";
+  window.scrollTo({ top:0, behavior:"smooth" });
+});
+
+document.getElementById("retry-btn").addEventListener("click", () => {
+  document.querySelectorAll('input[type="radio"]').forEach(el => el.checked = false);
+  document.getElementById("result").style.display = "none";
+  document.getElementById("survey").style.display = "block";
+  document.getElementById("start-card").style.display = "block";
+  updateProgress();
+  window.scrollTo({ top:0, behavior:"smooth" });
+});
+</script>
+</body>
+</html>
